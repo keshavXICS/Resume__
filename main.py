@@ -59,12 +59,14 @@ def extract_text_from_docx(file_path):
 
 def gemini_call(text_, json_format, model, query):
     try:
+        print('Gemini model call')
         response = model.generate_content(f"resume:{text_}, json_format:{json_format} query:{query}")
-        
+        print('raw data parsing')
         raw_text = response.candidates[0].content.parts[0].text
         match = re.search(r'```json\n(.*?)\n```', raw_text, re.DOTALL)
 
         if match:
+            print('load json file')
             embedded_json_text = match.group(1)
             parsed_dict = json.loads(embedded_json_text)
             return parsed_dict
@@ -75,8 +77,9 @@ def gemini_call(text_, json_format, model, query):
         print(f"Error Gemini: {e}")
         return {"Error": "Gemini failed"}
     
-def parse_resume(file_path):
+async def convert_into_text(file_path):
     try:
+        print("Convert file data into binary text")
         if file_path.endswith(".pdf"):
             text = extract_text_from_pdf(file_path)
         elif file_path.endswith(".docx"):
@@ -95,49 +98,59 @@ def gemini_configure():
     model = genai.GenerativeModel("gemini-1.5-flash")
     return model
 
-
-@app.post("/upload/")
-async def upload_resumes(files: List[UploadFile] = File(...)):
-    results = []
+async def read_files():
+    print('Query and JSON file reading')
+ 
     with open(f'jsonLayout.json', 'r') as blank_resume:
         json_format = json.load(blank_resume)
 
     with open('query.txt', 'r') as file:
         query = file.read()
 
+    return json_format, query
+
+async def write_resume_binary(file):
+    file_location = f"temp/{file.filename}"
+    file_data = await file.read()
+    print("Building sample file")
+    with open(file_location, "wb") as f:
+        f.write(file_data)
+    return file_location
 
 
-    for file in files:
-        file_location = f"temp/{file.filename}"
-        file_data = await file.read()
-        
-        with open(file_location, "wb") as f:
-            f.write(file_data)
-        
-        print(f'file created at location: {file_location}')
-        text = parse_resume(file_location)
-        # async with lock:
-        model = gemini_configure()
-        result = gemini_call(text, json_format, model, query)
-        x = collection.insert_one(result)
-        result['_id'] = str(result['_id'])
-        results.append(result)        
-        os.remove(file_location)
+async def fetch_data(file, results):
+    file_read = asyncio.create_task(read_files())
+    
+    file_location = asyncio.create_task(write_resume_binary(file))
+    
+    print(f'file created at location: {file_location}')
+    file_location_ = await file_location
+    text = asyncio.create_task(convert_into_text(file_location_))
+
+    print('Gemini configuration')
+    model = gemini_configure()
+
+    json_format, query = await file_read
+    text_ = await text
+    print('Calling Gemini')
+    result = gemini_call(text_, json_format, model, query)
+    
+    print('Insert data in DB')
+    collection.insert_one(result)
+    result['_id'] = str(result['_id'])
+    results.append(result)        
+    os.remove(file_location_)
+    return
+
+
+@app.post("/upload/")
+async def upload_resumes(files: List[UploadFile] = File(...)):
+    results = []
+    print('Hello')
+    await fetch_data(files[0], results)
+  
     return results
 
-def parse_resume_attachment(file_path):
-    if os.path.exists(file_path):
-        return parse_resume(file_path)
-    else:
-        print(f"Attachment not found: {file_path}")
-        return {"Error": "Attachment not found"}
-        
-def apply_fallback(parsed_data):
-    fields = ["name", "email", "phone", "skills", "experience", "current_company", "college_name", "designation"]
-    for field in fields:
-        if not parsed_data.get(field):
-            parsed_data[field] = "Not Found"
-    return parsed_data
 
 def serialize_document(doc):
     if '_id' in doc:
