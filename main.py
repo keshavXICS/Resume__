@@ -4,7 +4,7 @@ import pdfplumber
 import docx
 import pandas as pd
 import spacy
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from typing import List
 
 import uvicorn
@@ -14,7 +14,8 @@ import google.generativeai as genai
 import os
 import json
 import asyncio
-
+import time
+import queue_utils
 
 # Disable warnings
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
@@ -28,8 +29,7 @@ collection = db["profiles"]
 app = FastAPI()
 lock = asyncio.Lock()
 import time
-
-
+queue_utils.delete_queue(message="Delete Queue Completely")
         
 
 if __name__ == '__main__':
@@ -145,10 +145,15 @@ async def fetch_data(file, results):
 
 @app.post("/upload/")
 async def upload_resumes(files: List[UploadFile] = File(...)):
+    queue_utils.enqueue_message(message="User Request Added.")
     results = []
+
     print('Hello')
     await fetch_data(files[0], results)
-  
+    print(queue_utils.get_queue_length(), 'first')
+
+    queue_utils.dequeue_message(message="User Request Completed.")
+    print(queue_utils.get_queue_length(), 'second')
     return results
 
 
