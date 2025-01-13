@@ -99,7 +99,6 @@ async def fetch_data(file, results):
     
     file_location = asyncio.create_task(write_resume_binary(file))
     
-    # print(f'file created at location: {file_location}')
     file_location_ = await file_location
     text = asyncio.create_task(convert_into_text(file_location_))
 
@@ -110,10 +109,15 @@ async def fetch_data(file, results):
     text_ = await text
     print('Calling Gemini')
     result = gemini_call(text_, json_format, model, query)
+
+    email = result['node']['resume']['contactDetails']['email']
+    phone = result['node']['resume']['contactDetails']['phone']
+    filter = {"$or": [{"node.resume.contactDetails.email": email}, {"node.resume.contactDetails.phone": phone}]}
+    replacement = result    
+    print('Upsert data in DB')
+
+    collection.replace_one(filter, replacement, upsert=True)
     
-    print('Insert data in DB')
-    collection.insert_one(result)
-    result['_id'] = str(result['_id'])
     results.append(result)        
     os.remove(file_location_)
     return

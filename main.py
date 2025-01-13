@@ -33,6 +33,7 @@ if __name__ == '__main__':
 
 @app.post("/upload/")
 async def upload_resumes(files: List[UploadFile] = File(...)):
+    print('Hello')
     queue_utils.enqueue_message(message="User Request Added.")
     queue_utils.get_queue_length("User request inserted in queue")
 
