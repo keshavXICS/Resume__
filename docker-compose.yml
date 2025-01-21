@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  fastapi:
+    build: .
+    container_name: fastapi-container
+    ports:
+      - "8000:8000"
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=rootpassword
+      - MYSQL_DB=fastapidb
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DB=fastapidb
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./app:/app 
+    depends_on:
+      - mysql
+      - mongodb
+      - redis
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-container
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: fastapidb
+    ports:
+      - "3306:3306"
+
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb-container
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+      MONGO_INITDB_DATABASE: candidate_resume
+
+  redis:
+    image: redis:latest
+    container_name: redis-container
+    ports:
+      - "6379:6379"

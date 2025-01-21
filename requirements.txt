@@ -2,11 +2,19 @@ fastapi==0.115.6
 uvicorn==0.34.0
 pdfplumber==0.6.0
 python-docx==0.8.11
-pandas==2.1.1
-spacy==3.6.1
-nltk==3.9.0
 pymongo==4.6.0
-celery[redis]==5.4.0
 weasyprint==55.0
 aiohttp==3.8.1
-beautifulsoup4==4.12.2  # example version
+beautifulsoup4==4.12.2
+redis
+mysql-connector-python
+google-auth==2.37.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+passlib~=1.7.4
+python-jose
+google-generativeai==0.8.3
+fpdf2==2.8.2
+pypandoc==1.15
+python-multipart
+httpx==0.24.1
