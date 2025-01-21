@@ -90,7 +90,6 @@ def select_query(query):
 from datetime import datetime,  timedelta
 from jose import JWTError, jwt
 
-JWT_SECREY_KEY = "my_secret__key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1
 

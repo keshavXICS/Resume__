@@ -130,8 +130,6 @@ async def read_root(user: UserSignup):
         raise HTTPException(status_code=500, detail=f"Query failed: {err}")
 
 
-GOOGLE_CLIENT_ID = ""
-GOOGLE_CLIENT_SECRET = ""
 
 # google auth
 
