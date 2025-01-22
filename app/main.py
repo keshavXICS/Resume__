@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Response, Depends, Request, File, UploadFile, HTTPException
 from fastapi.params import Query
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from typing import List
 import os
 import uvicorn
@@ -18,6 +18,8 @@ from passlib.context import CryptContext
 from fastapi.responses import RedirectResponse
 from google.oauth2 import id_token
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.middleware.cors import CORSMiddleware
+
 
 from api.v1.auth.googleAuth import google_auth
 from api.v1.auth.googleAuth import google_user_data     
@@ -27,6 +29,8 @@ from api.v1.api.download import create_download_file
 # Disable warnings
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+
+
 
 
 @asynccontextmanager
@@ -41,6 +45,20 @@ async def lifespan(app: FastAPI):
 pwd_context =  CryptContext(schemes=["bcrypt"], deprecated="auto")
 app = FastAPI(lifespan=lifespan)
 lock = asyncio.Lock()
+
+origins = [
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 mysql_host = os.getenv("MYSQL_HOST", "mysql")
 mysql_user = os.getenv("MYSQL_USER", "root")
@@ -62,7 +80,7 @@ class UserSignup(BaseModel):
     #     orm_mode = True
 
 class UserIn(BaseModel):
-    email: str
+    userId: str
     password: str
 
 def hash_password(password: str)->str:
@@ -130,6 +148,8 @@ async def read_root(user: UserSignup):
         raise HTTPException(status_code=500, detail=f"Query failed: {err}")
 
 
+GOOGLE_CLIENT_ID = "148893426265-gubjmhk6laittlgtm46kckhsehgo7cb6.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "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"
 
 # google auth
 
@@ -158,6 +178,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 # jwt validation
 @app.post("/login")
 async def login(user:UserIn):
+    return {"Hello":f"message {user.userId}"}
+    return Response(user)
     result = loginUser(user)
     return result
 

@@ -3,6 +3,8 @@ from ..database.mysql_connect import get_db_connection
 import datetime
 import asyncio
 
+GOOGLE_CLIENT_ID = "148893426265-gubjmhk6laittlgtm46kckhsehgo7cb6.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "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"
 
 def google_auth():
     google_auth_url = (

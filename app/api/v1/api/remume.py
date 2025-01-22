@@ -8,7 +8,7 @@ import redis, redis.asyncio
 import google.generativeai as genai
 import os
 import json
-from connect_db import collection
+from ..database.mongo_connect import collection
 from fpdf import FPDF
 
 
