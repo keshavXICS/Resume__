@@ -89,8 +89,9 @@ def select_query(query):
 
 from datetime import datetime,  timedelta
 from jose import JWTError, jwt
+import os
 
-JWT_SECREY_KEY = "my_secret__key"
+JWT_SECREY_KEY = os.getenv("JWT_SECREY_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1
 

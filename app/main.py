@@ -148,8 +148,8 @@ async def read_root(user: UserSignup):
         raise HTTPException(status_code=500, detail=f"Query failed: {err}")
 
 
-GOOGLE_CLIENT_ID = "148893426265-gubjmhk6laittlgtm46kckhsehgo7cb6.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "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"
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 # google auth
 
