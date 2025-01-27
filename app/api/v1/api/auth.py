@@ -1,110 +1,96 @@
 from ..database.mysql_connect import get_db_connection
 from fastapi import HTTPException
 from passlib.context import CryptContext
-import asyncio
+from ..exception import CustomError
 
-pwd_context =  CryptContext(schemes=["bcrypt"], deprecated="auto")
+# from ..exception import CustomError
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+import os
 
-def hash_password(password: str)->str:
+# Constants
+JWT_SECRET_KEY = "my_secret_key"  # Preferably, use environment variables here
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 10
+
+# Initialize password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Helper Functions
+def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(plain_password: str, hashed_password: str )-> bool:
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-def check_user_Exist(user, cursor):
-    select_query = f"SELECT COUNT(*) FROM user_data WHERE email = {user.email};"
-    cursor.execute(select_query)
-    result = cursor.fetchone() 
-    if result['COUNT(*)']!=0:
-        return True
-
-    return False    
-
-
-def insert_user(user, cursor, conn):
-    try:
-        hashed_password = hash_password(user.password)
-
-        cursor.execute(
-        "INSERT INTO user_data (username, email, phone, password, created_at) VALUES (%s, %s, %s, %s, NOW())",
-        (user.username, user.email, user.phone, hashed_password)
-    )
-        conn.commit()
-        
-    except Exception as e:
-        raise f"Error in inserting data {e}"
-
-def list_all_users(cursor):
-    query = "select * from user_data;"
-    cursor.execute(query)  
-    return cursor.fetchall()
-
-async def registerUser(user):
-    
-    conn = asyncio.create_task(get_db_connection())
-    conn = await conn 
-    cursor = asyncio.current_task(conn.cursor(dictionary=True))
-    cursor = await cursor
-    if check_user_Exist(user, cursor):
-        return HTTPException(status_code=400, detail=f"Email already registered {result['COUNT(*)']}")
- 
-    insert_user(user, cursor, conn)
-    
-    result = asyncio.create_task(list_all_users(cursor))
-    conn.close()
-    result = await result
-
-    return {"data": result}
-
-    
-
-def loginUser(user):
-    result=select_query(f"select email, password from user_data where email='{user.email}' and password='{user.password}';")
-    if len(result)==0:
-        return {"error":"credential mismatch"}
-    bearer_token = create_access_token(data={"email":user.email, "password":user.password})
-    return {"bearer_token": bearer_token, "token_type":"bearer"}
-    # if result[0]['COUNT(*)']==0:
-    #     return 'Error: user not exist go to signup'
-    # if
-
-
-def select_query(query):
+def select_query(query: str, params: tuple = ()):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute(query)
+        cursor.execute(query, params)
         result = cursor.fetchall()
         conn.close()
         return result
     except Exception as e:
-        raise {"error":"Error in select query", "query":query}
+        raise CustomError(status_code=500, detail={"error": "Error in select query", "query": query, "message": str(e)})
 
+def check_user_exist(user, cursor):
+    query = "SELECT COUNT(*) FROM user_data WHERE email = %s;"
+    cursor.execute(query, (user.email,))
+    result = cursor.fetchone()
+    return result['COUNT(*)'] > 0
 
+def insert_user(user, cursor, conn):
+    try:
+        hashed_password = hash_password(user.password)
+        cursor.execute(
+            "INSERT INTO user_data (username, email, phone, password, created_at) VALUES (%s, %s, %s, %s, NOW())",
+            (user.username, user.email, user.phone, hashed_password)
+        )
+        conn.commit()
+    except Exception as e:
+        raise CustomError(status_code=500, detail=f"Error inserting user data: {e}")
 
+def list_all_users(cursor):
+    query = "SELECT * FROM user_data;"
+    cursor.execute(query)
+    return cursor.fetchall()
 
+# Main Logic Functions
+async def register_user(user):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
 
+    if check_user_exist(user, cursor):
+        conn.close()
+        raise HTTPException(status_code=400, detail="Email already registered")
 
+    insert_user(user, cursor, conn)
+    conn.close()
+    return {"message": "User registration successful"}
 
+def login_user(user):
+    query = "SELECT email, password FROM user_data WHERE email = %s;"
+    
+    result = select_query(query, (user.email,))
+    
+    if not result or not verify_password(user.password, result[0]['password']):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    print(1)
 
-from datetime import datetime,  timedelta
-from jose import JWTError, jwt
-import os
+    bearer_token = create_access_token(data={"email": user.email})
+    return {"bearer_token": bearer_token, "token_type": "bearer"}
 
-JWT_SECREY_KEY = os.getenv("JWT_SECREY_KEY")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1
-
-def create_access_token(data:dict):
+# JWT Functions
+def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp":expire})
-    return jwt.encode(to_encode, JWT_SECREY_KEY, algorithm=ALGORITHM)
-
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=ALGORITHM)
 
 def verify_token(token: str):
     try:
-        payload = jwt.decode(token, JWT_SECREY_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except JWTError:
-        return None
+        raise CustomError(status_code=401, detail="Invalid or expired token")

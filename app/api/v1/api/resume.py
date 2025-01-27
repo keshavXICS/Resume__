@@ -1,50 +1,49 @@
-from fastapi import HTTPException
-import asyncio
-import pdfminer, pdfplumber
-import docx
-import re
-import queue_utils
-import redis, redis.asyncio
-import google.generativeai as genai
 import os
 import json
-from ..database.mongo_connect import collection
+import re
+import asyncio
+import pdfplumber
+import docx
+import redis
+import redis.asyncio
+import google.generativeai as genai
+from fastapi import HTTPException
+from ..exception import CustomError
+# from ....exception import CustomError
 from fpdf import FPDF
+from ..database.mongo_connect import collection
 
-
-
+# Log utility function
 def write_log(message: str):
     with open("log.txt", "a") as log_file:
         log_file.write(f"{message}\n")
 
-# Function to extract text from PDF
-def extract_text_from_pdf(file_path):
+# PDF text extraction
+def extract_text_from_pdf(file_path: str) -> str:
     try:
         with pdfplumber.open(file_path) as pdf:
             return " ".join(page.extract_text() for page in pdf.pages)
     except Exception as e:
-        write_log("error extracting text from pdf")
-        raise HTTPException(status_code=400, detail="failed to extract text from pdf")
+        write_log("Error extracting text from PDF")
+        raise CustomError(status_code=400, detail="Failed to extract text from PDF")
 
-# Function to extract text from DOCX
-def extract_text_from_docx(file_path):
+# DOCX text extraction
+def extract_text_from_docx(file_path: str) -> str:
     try:
         doc = docx.Document(file_path)
         return " ".join([para.text for para in doc.paragraphs])
     except Exception as e:
         write_log(f"Error extracting text from DOCX: {e}")
-        raise HTTPException(status_code=400, detail="Failed to extract text from DOCX")
+        raise CustomError(status_code=400, detail="Failed to extract text from DOCX")
 
-def gemini_call(text_, json_format, model, query):
+# Gemini AI model call
+def gemini_call(text_: str, json_format: dict, model, query: str) -> dict:
     try:
-        print('Gemini model call')
         response = model.generate_content(f"resume:{text_}, json_format:{json_format} query:{query}")
-        print('raw data parsing')
         raw_text = response.candidates[0].content.parts[0].text
         match = re.search(r'```json\n(.*?)\n```', raw_text, re.DOTALL)
 
         if match:
-            print('load json file')
             embedded_json_text = match.group(1)
             parsed_dict = json.loads(embedded_json_text)
             return parsed_dict
@@ -52,38 +51,34 @@ def gemini_call(text_, json_format, model, query):
             return {"error": "No JSON found in response"}
     
     except Exception as e:
-        print(f"Error Gemini: {e}")
+        write_log(f"Gemini failed: {e}")
         return {"Error": "Gemini failed"}
-    
-async def convert_into_text(file_path):
+
+# Convert file to text based on file type
+async def convert_into_text(file_path: str) -> str:
     try:
-        print("Convert file data into binary text")
         if file_path.endswith(".pdf"):
             return extract_text_from_pdf(file_path)
         elif file_path.endswith(".docx"):
             return extract_text_from_docx(file_path)
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file format")
-
+            raise CustomError(status_code=400, detail="Unsupported file format")
     except Exception as e:
         write_log(f"Error converting file to text: {e}")
-        raise HTTPException(status_code=500, detail="File conversion failed")
+        raise CustomError(status_code=500, detail="File conversion failed")
 
-
+# Gemini model configuration
 def gemini_configure():
     try:
-        # my_api_key = os.getenv('GEMINI_API_KEY')
         my_api_key = "AIzaSyCcZr0RM0l0FTdwIHJ9SqYH_zxPW304nqM"
         genai.configure(api_key=my_api_key)
         return genai.GenerativeModel("gemini-1.5-flash")
-        
     except Exception as e:
-        write_log(f"Error in gemini configuration: {e}")
-        raise HTTPException(status_code=500, detail="Failed to configure Gemini")
+        write_log(f"Error in Gemini configuration: {e}")
+        raise CustomError(status_code=500, detail="Failed to configure Gemini")
 
-
-async def read_files():
-    print('Query and JSON file reading')
+# Read files (query & JSON layout)
+async def read_files() -> tuple:
     try:
         with open(f'jsonLayout.json', 'r') as blank_resume:
             json_format = json.load(blank_resume)
@@ -93,30 +88,27 @@ async def read_files():
 
         return json_format, query
     except Exception as e:
-        write_log(f"Error in reading files{e}")
-        raise HTTPException(status_code=500, detail="Failed to read query or JSON layout")
+        write_log(f"Error in reading files: {e}")
+        raise CustomError(status_code=500, detail="Failed to read query or JSON layout")
 
-
-async def write_resume_binary(file):
+# Write resume to binary file
+async def write_resume_binary(file) -> str:
     try:
         os.makedirs("temp", exist_ok=True)
         file_location = f"temp/{file.filename}"
         file_data = await file.read()
-        print("Building sample file")
         with open(file_location, "wb") as f:
             f.write(file_data)
         return file_location
     except Exception as e:
         write_log(f"Error writing binary file: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create binary file")
+        raise CustomError(status_code=500, detail="Failed to create binary file")
 
-
+# Main function to fetch data
 async def fetch_data(file, results):
     try:
         file_read = asyncio.create_task(read_files())
-        
         file_location = asyncio.create_task(write_resume_binary(file))
-        
         file_location_ = await file_location
         text = asyncio.create_task(convert_into_text(file_location_))
 
@@ -125,26 +117,27 @@ async def fetch_data(file, results):
         json_format, query = await file_read
         text_ = await text
         result = gemini_call(text_, json_format, model, query)
-        email = result['node']['resume']['contactDetails']['email']
-        phone = result['node']['resume']['contactDetails']['phone']
-        try:
-            filter = {"$or": [{"node.resume.contactDetails.email": email}, {"node.resume.contactDetails.phone": phone}]}
-            replacement = result
-            collection.replace_one(filter, replacement, upsert=True)
-        except Exception as e:
-            raise {"error": "error in DB insert or update"}
-        results.append(result)     
-
+        
+        # Extract email and phone (based on your requirements)
+        email = ""
+        phone = ""
+        
+        filter = {"$or": [{"node.resume.contactDetails.email": email}, {"node.resume.contactDetails.phone": phone}]}
+        collection.replace_one(filter, result, upsert=True)
+        
+        results.append(result)
         os.remove(file_location_)
         return
+
     except HTTPException as he:
         write_log(f"HttpException: {he.detail}")
         raise he
     except Exception as e:
-        write_log(f"Unexpected error:: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
-    
-def generate_pdf_resume():
+        write_log(f"Unexpected error: {e}")
+        raise CustomError(status_code=500, detail="An unexpected error occurred")
+
+# PDF resume generation (template example)
+def generate_pdf_resume() -> str:
     html_content = """
     <html>
         <head>

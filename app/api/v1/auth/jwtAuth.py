@@ -1,3 +1,12 @@
+from ..exception import CustomError
+from fastapi import HTTPException
+from passlib.context import CryptContext
+from ..database.mysql_connect import get_db_connection
+
+# Set up password context for hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Fake user database (for demo purposes)
 fake_users_db = {
     "keshav": {
         "username": "keshav",
@@ -9,31 +18,32 @@ fake_users_db = {
     }
 }
 
-from fastapi import HTTPException
-from passlib.context import CryptContext
-
-pwd_context =  CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str)->str:
+# Hash password function
+def hash_password(password: str) -> str:
+    """Hashes a password."""
     return pwd_context.hash(password)
 
-def verify_password(plain_password: str, hashed_password: str )-> bool:
+# Verify password function
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plain password against a hashed password."""
     return pwd_context.verify(plain_password, hashed_password)
 
-
+# User sign-up function
 async def userSignUp(user):
-
+    """Signs up a new user if the username does not exist."""
     if user.username in fake_users_db:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise CustomError(status_code=400, detail="Username already exists")
 
-    hashed_password  = hash_password(user.password)
+    # Hash the user's password
+    hashed_password = hash_password(user.password)
 
-    fake_users_db[user.username] = {"username":user.username, "password":hashed_password}
+    # Add the user to the fake database
+    fake_users_db[user.username] = {"username": user.username, "password": hashed_password}
     return fake_users_db
 
-
-from ..database.mysql_connect import get_db_connection
-def select_query(query):
+# Function to execute a SELECT query
+def select_query(query: str):
+    """Executes a SELECT query and returns the result."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -42,15 +52,16 @@ def select_query(query):
         conn.close()
         return result
     except Exception as e:
-        raise {"error":"Error in select query", "query":query}
+        raise CustomError(status_code=400, detail=f"Error in SELECT query: {e}")
 
-def insert_query(query):
+# Function to execute an INSERT query
+def insert_query(query: str):
+    """Executes an INSERT query."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(query)
         conn.commit()
         conn.close()
-        return
     except Exception as e:
-        return e
+        raise CustomError(status_code=400, detail=f"Error in INSERT query: {e}")

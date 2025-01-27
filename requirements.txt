@@ -18,3 +18,4 @@ fpdf2==2.8.2
 pypandoc==1.15
 python-multipart
 httpx==0.24.1
+google-auth-oauthlib==1.2.1

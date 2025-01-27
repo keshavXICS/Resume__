@@ -2,58 +2,53 @@ import os
 from fastapi.responses import StreamingResponse
 from bs4 import BeautifulSoup
 from weasyprint import HTML
-import io 
+import io
 from docx import Document
 import tempfile
-import asyncio
+from ..exception import CustomError
 
-def download_pdf(html_content):
+async def generate_pdf(html_content: str) -> StreamingResponse:
     try:
+        # Generate PDF using WeasyPrint
         html = HTML(string=html_content)
         pdf = html.write_pdf()
 
-        pdf_stream = io.BytesIO(pdf)    
+        pdf_stream = io.BytesIO(pdf)
         return StreamingResponse(pdf_stream, 
-                                media_type="application/pdf",
-                                headers={"Content-Disposition": 
-                                        "attachment; filename=preview_page.pdf"})
+                                 media_type="application/pdf",
+                                 headers={"Content-Disposition": "attachment; filename=preview_page.pdf"})
     except Exception as e:
-        raise f"Error while creating PDF file to download {e}"
+        raise CustomError(status_code=500, detail=f"Error while creating PDF file: {e}")
 
-async def download_docx(html_content):
+async def generate_docx(html_content: str) -> StreamingResponse:
     try:
-        soup = asyncio.create_task(BeautifulSoup(html_content, "html.parser"))
-        doc = asyncio.create_task(Document())
-        soup = await soup
-        text_content =  asyncio.create_task(soup.get_text())
-        # Generate DOCX using python-docx
-        text_content = await text_content
-        doc = await doc
+        # Parse HTML content with BeautifulSoup and generate DOCX
+        soup = BeautifulSoup(html_content, "html.parser")
+        doc = Document()
+        text_content = soup.get_text()
+
         doc.add_paragraph(text_content)
         
-        # Create a temporary file to save the DOCX content
+        # Save the DOCX to a temporary file
         tmp_docx = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
         doc.save(tmp_docx.name)
-        
+
         # Return the DOCX file
         with open(tmp_docx.name, "rb") as f:
             docx_data = f.read()
 
         os.remove(tmp_docx.name)
-        
-        return StreamingResponse(io.BytesIO(docx_data), media_type=
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": "attachment; filename=preview_page.docx"})
-    except Exception as e:
-        raise f"Error while creating Docx file to download {e}"
 
-async def create_download_file(str: format, html_content):
+        return StreamingResponse(io.BytesIO(docx_data), 
+                                 media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                 headers={"Content-Disposition": "attachment; filename=preview_page.docx"})
+    except Exception as e:
+        raise CustomError(status_code=500, detail=f"Error while creating Docx file: {e}")
+
+async def create_download_file(format: str, html_content: str) -> StreamingResponse:
     if format == "pdf":
-        # Generate PDF using WeasyPrint (or any other method)
-        return download_pdf(html_content)
-        
+        return await generate_pdf(html_content)
     elif format == "docx":
-        # Convert HTML to text using BeautifulSoup
-        return download_docx(html_content)
+        return await generate_docx(html_content)
     else:
-        raise "Only support pdf and docs file"
+        raise CustomError(status_code=400, detail="Only PDF and DOCX formats are supported")
