@@ -21,6 +21,7 @@ from api.v1.database.mongo_connect import collection
 from api.v1.api.auth import register_user, login_user, verify_token
 from api.v1.api.download import create_download_file
 from api.v1.auth.googleAuth import google_auth, google_user_data
+from api.v1.database.mysql_connect import create_mysql_tables
 
 # Disable warnings
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        queue_utils.get_queue_length("One User request complete")
         print('Shutting Down.....')
         
 # FastAPI app setup
@@ -58,6 +60,7 @@ mysql_host = os.getenv("MYSQL_HOST", "mysql")
 mysql_user = os.getenv("MYSQL_USER", "root")
 mysql_password = os.getenv("MYSQL_PASSWORD", "rootpassword")
 mysql_db = os.getenv("MYSQL_DB", "fastapidb")
+create_mysql_tables()
 
 
 

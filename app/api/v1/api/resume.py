@@ -121,11 +121,23 @@ async def fetch_data(file, results):
         # Extract email and phone (based on your requirements)
         email = ""
         phone = ""
-        
-        filter = {"$or": [{"node.resume.contactDetails.email": email}, {"node.resume.contactDetails.phone": phone}]}
+        filter=""
+        try:
+            email = result['basics']['email']
+            phone = result['basics']['phone']            
+            # filter = {"$or": [{"basics.email": "Chandnaprateek2001@gmail.com"}, {"basics.phone": "+919649816815"}]}
+            filter = {"$or": [{"basics.email": email}, {"basics.phone": phone}]}
+            # Chandnaprateek2001@gmail.com +919649816815
+
+        except Exception as e:
+            print(e,email,phone)
+
         collection.replace_one(filter, result, upsert=True)
-        
-        results.append(result)
+        data = collection.find(filter)
+        data = list(data)
+        data = serialize_document(data[0])
+        results.append(data)
+        print(results)
         os.remove(file_location_)
         return
 
@@ -135,6 +147,11 @@ async def fetch_data(file, results):
     except Exception as e:
         write_log(f"Unexpected error: {e}")
         raise CustomError(status_code=500, detail="An unexpected error occurred")
+
+def serialize_document(doc):
+    if '_id' in doc:
+        doc['_id'] = str(doc['_id'])
+    return doc
 
 # PDF resume generation (template example)
 def generate_pdf_resume() -> str:

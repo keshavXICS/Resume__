@@ -63,7 +63,7 @@ async def register_user(user):
 
     if check_user_exist(user, cursor):
         conn.close()
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise CustomError(status_code=400, detail="Email already registered")
 
     insert_user(user, cursor, conn)
     conn.close()
@@ -76,7 +76,6 @@ def login_user(user):
     
     if not result or not verify_password(user.password, result[0]['password']):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    print(1)
 
     bearer_token = create_access_token(data={"email": user.email})
     return {"bearer_token": bearer_token, "token_type": "bearer"}
