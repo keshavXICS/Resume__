@@ -20,7 +20,7 @@ from api.v1.api.resume import fetch_data
 from api.v1.database.mongo_connect import collection
 from api.v1.api.auth import register_user, login_user, verify_token
 from api.v1.api.download import create_download_file
-from api.v1.auth.googleAuth import google_auth, google_user_data
+from api.v1.auth.googleAuth import google_user_data
 from api.v1.database.mysql_connect import create_mysql_tables
 
 # Disable warnings
@@ -174,11 +174,16 @@ def google_login():
 @app.get('/auth/done')
 async def get_data(code: str):
     try:
-        flow.fetch_token(code=code)
+        token_data = flow.fetch_token(code=code)
         credentials = flow.credentials
+        # print(f"Access Token: {credentials.token}")  # Use this token in API requests
+        # print(f"Refresh Token: {credentials.refresh_token}")  # Can be used to refresh expired tokens
+        # print(f"Token Expiry: {credentials.expiry}")
         redirect_response = RedirectResponse("http://localhost:5173/user")
         redirect_response.set_cookie(key="auth_token", value=credentials.id_token, httponly=True, secure=True, samesite="Strict")
-        data = google_user_data(credentials.token)
+        # data = await google_user_data(credentials.token)
+        data = await google_user_data(token_data)
+
         return redirect_response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Google authentication failed: {str(e)}")

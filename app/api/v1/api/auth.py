@@ -12,6 +12,11 @@ import os
 JWT_SECRET_KEY = "my_secret_key"  # Preferably, use environment variables here
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 10
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "148893426265-gubjmhk6laittlgtm46kckhsehgo7cb6.apps.googleusercontent.com")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "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")
+REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:8000/auth/done")
+JWT_SECREY_KEY = os.getenv("JWT_SECRET_KEY", "my_secret__key")
+
 
 # Initialize password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -46,6 +51,11 @@ def insert_user(user, cursor, conn):
         cursor.execute(
             "INSERT INTO user_data (username, email, phone, password, created_at) VALUES (%s, %s, %s, %s, NOW())",
             (user.username, user.email, user.phone, hashed_password)
+        )
+        conn.commit()
+        cursor.execute(
+            "INSERT INTO resume_map (email) VALUES (%s)",
+            (user.email)
         )
         conn.commit()
     except Exception as e:

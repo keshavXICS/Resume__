@@ -28,7 +28,7 @@ def create_mysql_tables():
     create_resume_map_table = """
     CREATE TABLE IF NOT EXISTS resume_map (
         email VARCHAR(255) NOT NULL,
-        mongo_resume_id VARCHAR(255) NOT NULL,
+        mongo_resume_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     );
@@ -45,11 +45,22 @@ def create_mysql_tables():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     );
     """
+    create_user_tokens = """
+    CREATE TABLE IF NOT EXISTS user_tokens (
+        email VARCHAR(255) UNIQUE,
+        bearer_token text,
+        expiry_time datetime,
+        access_token text
+    );
+    """
+
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
             cursor.execute(create_resume_map_table)
             cursor.execute(create_user_data_table)
+            cursor.execute(create_user_tokens)
+
         connection.commit()
         print("Tables `resume_map` and `user_data` ensured in the database.")
     finally:

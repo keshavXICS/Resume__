@@ -12,6 +12,7 @@ from ..exception import CustomError
 # from ....exception import CustomError
 from fpdf import FPDF
 from ..database.mongo_connect import collection
+from ..database.mysql_connect import get_db_connection
 
 # Log utility function
 def write_log(message: str):
@@ -125,10 +126,9 @@ async def fetch_data(file, results):
         try:
             email = result['basics']['email']
             phone = result['basics']['phone']            
-            # filter = {"$or": [{"basics.email": "Chandnaprateek2001@gmail.com"}, {"basics.phone": "+919649816815"}]}
-            filter = {"$or": [{"basics.email": email}, {"basics.phone": phone}]}
-            # Chandnaprateek2001@gmail.com +919649816815
 
+            filter = {"$or": [{"basics.email": email}, {"basics.phone": phone}]}
+        
         except Exception as e:
             print(e,email,phone)
 
@@ -136,6 +136,16 @@ async def fetch_data(file, results):
         data = collection.find(filter)
         data = list(data)
         data = serialize_document(data[0])
+
+        mongo_resume_id = data['_id']
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute(
+            "update resume_map set mongo_resume_id = (%s)",
+            (mongo_resume_id)
+        )
+        conn.commit()
         results.append(data)
         print(results)
         os.remove(file_location_)
